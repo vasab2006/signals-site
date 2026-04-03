@@ -1,0 +1,62 @@
+<script>
+async function getSignal(){
+  const pairMap = {
+    "FX:EURUSD":"EURUSDT",
+    "FX:GBPUSD":"GBPUSDT",
+    "FX:USDJPY":"BTCUSDT" // временно (нет форекс в Binance)
+  };
+
+  const tvPair = document.getElementById("pair").value;
+  const pair = pairMap[tvPair] || "BTCUSDT";
+
+  const API = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=1m&limit=100`;
+
+  const res = await fetch(API);
+  const raw = await res.json();
+
+  const close = raw.map(c => parseFloat(c[4]));
+
+  function ema(src,len){
+    const a=2/(len+1), out=[src[0]];
+    for(let i=1;i<src.length;i++){
+      out[i]=a*src[i]+(1-a)*out[i-1];
+    }
+    return out;
+  }
+
+  function rsi(src,len){
+    let g=0,l=0;
+    for(let i=1;i<=len;i++){
+      const d=src[i]-src[i-1];
+      if(d>0) g+=d; else l-=d;
+    }
+    g/=len; l/=len;
+    return 100-(100/(1+g/(l||1)));
+  }
+
+  const ema50 = ema(close,50);
+  const ema200 = ema(close,200);
+  const r = rsi(close,14);
+
+  const price = close[close.length-1];
+  const signalEl = document.getElementById("signal");
+
+  // ===== ЛОГИКА =====
+
+  if(price > ema200[ema200.length-1] && r < 35){
+    signalEl.className="buy";
+    signalEl.innerText="BUY 📈";
+  }
+  else if(price < ema200[ema200.length-1] && r > 65){
+    signalEl.className="sell";
+    signalEl.innerText="SELL 📉";
+  }
+  else{
+    signalEl.className="wait";
+    signalEl.innerText="WAIT";
+  }
+}
+
+setInterval(getSignal, 5000);
+getSignal();
+</script>
